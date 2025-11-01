@@ -1,0 +1,22 @@
+# This file contains machine-specific properties for the Android project.
+# Copy this file to local.properties and fill in your actual API keys.
+
+# Google Maps API Key
+MAPS_API_KEY=your_google_maps_api_key_here
+
+# Eventbrite API Key
+EVENTBRITE_API_KEY=your_eventbrite_api_key_here
+
+# Meetup API Key
+MEETUP_API_KEY=your_meetup_api_key_here
+
+# Facebook App ID
+FACEBOOK_APP_ID=your_facebook_app_id_here
+
+# Facebook Client Token
+FACEBOOK_CLIENT_TOKEN=your_facebook_client_token_here
+
+# Open Data România (no API key required)
+# This is a free public API
+
+# Note: Make sure to add local.properties to .gitignore to keep your API keys secure

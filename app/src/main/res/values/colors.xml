@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- LocalPulse Brand Colors -->
+    <color name="pulse_primary">#6C5CE7</color>
+    <color name="pulse_primary_variant">#5B4BD1</color>
+    <color name="pulse_secondary">#00CEC9</color>
+    <color name="pulse_secondary_variant">#00B4B8</color>
+    
+    <color name="pulse_background">#F8F9FA</color>
+    <color name="pulse_surface">#FFFFFF</color>
+    <color name="pulse_error">#E74C3C</color>
+    
+    <color name="pulse_on_primary">#FFFFFF</color>
+    <color name="pulse_on_secondary">#FFFFFF</color>
+    <color name="pulse_on_background">#2D3436</color>
+    <color name="pulse_on_surface">#2D3436</color>
+    <color name="pulse_on_error">#FFFFFF</color>
+    
+    <!-- Category Colors -->
+    <color name="music_color">#E17055</color>
+    <color name="tech_color">#74B9FF</color>
+    <color name="sports_color">#00B894</color>
+    <color name="food_color">#FDCB6E</color>
+    <color name="art_color">#E84393</color>
+    <color name="education_color">#6C5CE7</color>
+    <color name="business_color">#636E72</color>
+    <color name="health_color">#00CEC9</color>
+    <color name="family_color">#FDCB6E</color>
+    <color name="nightlife_color">#2D3436</color>
+</resources>

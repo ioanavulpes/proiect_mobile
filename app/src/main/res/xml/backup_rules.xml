@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Exclude sensitive data from backup -->
+    <exclude domain="sharedpref" path="firebase_auth_prefs.xml"/>
+    <exclude domain="sharedpref" path="firebase_analytics_prefs.xml"/>
+    <exclude domain="sharedpref" path="firebase_messaging_prefs.xml"/>
+    <exclude domain="sharedpref" path="firebase_ml_prefs.xml"/>
+    <exclude domain="sharedpref" path="firebase_firestore_prefs.xml"/>
+    <exclude domain="sharedpref" path="firebase_database_prefs.xml"/>
+    <exclude domain="sharedpref" path="firebase_storage_prefs.xml"/>
+</full-backup-content>
