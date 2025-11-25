@@ -1,0 +1,64 @@
+// Firebase Firestore Security Rules for LocalPulse App
+// Copy and paste these rules into your Firestore Database Rules tab in Firebase Console
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Users collection
+    // - Users can only read their own user document
+    // - Users can only write (create/update) their own user document
+    // - User ID in the document path must match the authenticated user's UID
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Favorites collection
+    // - Users can only read favorites where userId field matches their UID
+    // - Users can create new favorites only with their own userId
+    // - Users can update/delete favorites only if the userId field matches their UID
+    // - This prevents users from accessing or modifying other users' favorites
+    match /favorites/{favoriteId} {
+      // Read: User must be authenticated and the favorite must belong to them
+      allow read: if request.auth != null && 
+                     resource.data.userId == request.auth.uid;
+      
+      // Create: User must be authenticated and must set userId to their own UID
+      allow create: if request.auth != null && 
+                       request.resource.data.userId == request.auth.uid;
+      
+      // Update/Delete: User must be authenticated and the favorite must belong to them
+      allow update, delete: if request.auth != null && 
+                               resource.data.userId == request.auth.uid;
+    }
+    
+    // Deny all other access by default
+    // Any collection not explicitly allowed above will be denied
+  }
+}
+
+// TESTING THE RULES:
+// After deploying these rules, you can test them in the Firebase Console:
+// 1. Go to Firestore Database > Rules
+// 2. Click on "Rules playground" tab
+// 3. Test different scenarios:
+//    - Authenticated user reading their own data (should succeed)
+//    - Authenticated user reading another user's data (should fail)
+//    - Unauthenticated user trying to read/write (should fail)
+
+// IMPORTANT NOTES:
+// - These rules ensure data privacy and security
+// - Users cannot see other users' favorites
+// - All operations require authentication
+// - The userId field in favorites must match the authenticated user's UID
+// - These rules are suitable for production use
+
+// DEPLOYMENT:
+// 1. Go to Firebase Console: https://console.firebase.google.com/
+// 2. Select your project
+// 3. Navigate to Firestore Database
+// 4. Click on "Rules" tab
+// 5. Replace existing rules with the rules above
+// 6. Click "Publish"
+

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LocalPulse</string>
+    
+    <!-- 
+        TICKETMASTER API KEY CONFIGURATION
+        ==================================
+        To use the Ticketmaster Discovery API, you need an API key:
+        
+        1. Visit https://developer.ticketmaster.com/
+        2. Sign up for a free account or log in
+        3. Go to "Apps" > "Create a new app"
+        4. Fill in the app details:
+           - App Name: LocalPulse
+           - Description: Android event discovery app
+           - URL: http://localhost (or your website)
+        5. Click "Save" and copy your Consumer Key (API Key)
+        6. Replace YOUR_TICKETMASTER_API_KEY_HERE below with your actual key
+        
+        Example:
+        <string name="ticketmaster_api_key">abc123xyz456YourApiKeyHere</string>
+        
+        Rate Limit: 5000 requests per day (free tier)
+        
+        Important: Keep this key secure. Do not share it publicly or commit it to version control
+        if your repository is public. Consider using local.properties or environment variables
+        for production apps.
+    -->
+    <string name="ticketmaster_api_key">YOUR_TICKETMASTER_API_KEY_HERE</string>
+    
+    <!-- Auth -->
+    <string name="login">Login</string>
+    <string name="register">Register</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="confirm_password">Confirm Password</string>
+    <string name="dont_have_account">Don\'t have an account? Register</string>
+    <string name="already_have_account">Already have an account? Login</string>
+    <string name="logout">Logout</string>
+    
+    <!-- Home -->
+    <string name="welcome">Welcome to LocalPulse</string>
+    <string name="events">Evenimente</string>
+    <string name="favorites">Favorite</string>
+    <string name="map">Harta</string>
+    <string name="recommendations">Recomandări</string>
+    <string name="discover_events">Discover local events</string>
+    <string name="your_saved_events">Your saved events</string>
+    <string name="explore_map">Explore on map</string>
+    <string name="personalized_recommendations">Personalized for you</string>
+    
+    <!-- Events -->
+    <string name="search_city">Search city…</string>
+    <string name="search_events">Search Events</string>
+    <string name="event_details">Event Details</string>
+    <string name="open_eventbrite">Open in Eventbrite</string>
+    <string name="add_to_favorites">Add to Favorites</string>
+    <string name="remove_from_favorites">Remove from Favorites</string>
+    
+    <!-- Favorites -->
+    <string name="my_favorites">My Favorites</string>
+    <string name="no_favorites">No favorites yet</string>
+    <string name="start_adding_favorites">Start adding events to your favorites!</string>
+    
+    <!-- Placeholder screens -->
+    <string name="coming_soon">Coming Soon</string>
+    <string name="map_coming_soon">Google Maps integration will be available soon. You\'ll be able to explore events on an interactive map.</string>
+    <string name="recommendations_coming_soon">AI-powered recommendations will be available soon. Get personalized event suggestions based on your interests.</string>
+    
+    <!-- Common -->
+    <string name="loading">Loading…</string>
+    <string name="error">Error</string>
+    <string name="retry">Retry</string>
+    <string name="no_results">No results found</string>
+    <string name="pull_to_refresh">Pull to refresh</string>
+</resources>
+
