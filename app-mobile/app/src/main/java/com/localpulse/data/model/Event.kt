@@ -3,7 +3,7 @@ package com.localpulse.data.model
 import kotlinx.serialization.Serializable
 
 /**
- * Event data model representing an event from Eventbrite API
+ * Event data model representing an event from Ticketmaster API
  */
 @Serializable
 data class Event(
@@ -14,6 +14,8 @@ data class Event(
     val image: String? = null,
     val startTime: String = "",
     val venueName: String = "",
-    val venueAddress: String = ""
+    val venueAddress: String = "",
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 

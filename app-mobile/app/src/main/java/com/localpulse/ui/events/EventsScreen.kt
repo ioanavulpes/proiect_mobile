@@ -75,33 +75,17 @@ fun EventsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Search bar
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedTextField(
-                    value = searchCity,
-                    onValueChange = { searchCity = it },
-                    label = { Text(stringResource(R.string.search_city)) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true
-                )
-
-                Button(
-                    onClick = {
-                        searchQuery = searchCity
-                        viewModel.searchEvents(searchCity)
-                    },
-                    modifier = Modifier.height(56.dp)
-                ) {
-                    Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_events))
+            // Advanced Search Bar with filters
+            AdvancedSearchBar(
+                onSearch = { city, keyword, category ->
+                    searchQuery = city
+                    viewModel.searchEvents(
+                        city = city,
+                        keyword = keyword,
+                        category = category
+                    )
                 }
-            }
+            )
 
             // Events list
             SwipeRefresh(

@@ -34,18 +34,52 @@ class TicketmasterApiService(private val context: Context) {
     }
 
     /**
-     * Fetches events from Ticketmaster API based on city location
+     * Fetches events from Ticketmaster API with advanced filters
      * @param city The city to search for events
+     * @param keyword Search keyword (artist, event name, venue)
+     * @param category Event category (music, sports, arts, etc.)
+     * @param startDate Start date in format YYYY-MM-DDTHH:mm:ssZ
+     * @param endDate End date in format YYYY-MM-DDTHH:mm:ssZ
      * @return List of Event objects
      */
-    suspend fun searchEvents(city: String = Constants.DEFAULT_CITY): List<Event> {
+    suspend fun searchEvents(
+        city: String = Constants.DEFAULT_CITY,
+        keyword: String = "",
+        category: String = "",
+        startDate: String = "",
+        endDate: String = ""
+    ): List<Event> {
         val apiKey = context.getString(R.string.ticketmaster_api_key)
         
         // Build URL with query parameters
-        val url = "${Constants.TICKETMASTER_BASE_URL}${Constants.TICKETMASTER_EVENTS_ENDPOINT}" +
-                "?apikey=$apiKey" +
-                "&city=$city" +
-                "&size=${Constants.DEFAULT_PAGE_SIZE}"
+        val urlBuilder = StringBuilder()
+        urlBuilder.append("${Constants.TICKETMASTER_BASE_URL}${Constants.TICKETMASTER_EVENTS_ENDPOINT}")
+        urlBuilder.append("?apikey=$apiKey")
+        urlBuilder.append("&size=${Constants.DEFAULT_PAGE_SIZE}")
+        
+        // Add optional parameters
+        if (city.isNotBlank() && city != "All Cities") {
+            // Try countryCode for better Romania coverage
+            val romanianCities = listOf("Bucharest", "Cluj-Napoca", "Timisoara", "Iasi", "Brasov", "Constanta")
+            if (romanianCities.any { it.equals(city, ignoreCase = true) }) {
+                urlBuilder.append("&countryCode=RO")
+            }
+            urlBuilder.append("&city=$city")
+        }
+        if (keyword.isNotBlank()) {
+            urlBuilder.append("&keyword=$keyword")
+        }
+        if (category.isNotBlank()) {
+            urlBuilder.append("&classificationName=$category")
+        }
+        if (startDate.isNotBlank()) {
+            urlBuilder.append("&startDateTime=$startDate")
+        }
+        if (endDate.isNotBlank()) {
+            urlBuilder.append("&endDateTime=$endDate")
+        }
+        
+        val url = urlBuilder.toString()
 
         val request = Request.Builder()
             .url(url)
@@ -72,7 +106,14 @@ class TicketmasterApiService(private val context: Context) {
 
             val responseBody = response.body?.string() ?: throw Exception("Empty response body")
             
-            android.util.Log.d("TicketmasterAPI", "Response body (first 500 chars): ${responseBody.take(500)}")
+            android.util.Log.d("TicketmasterAPI", "Response body (first 1000 chars): ${responseBody.take(1000)}")
+            
+            // Check if we have events
+            if (responseBody.contains("\"_embedded\"")) {
+                android.util.Log.d("TicketmasterAPI", "✅ Events found in response!")
+            } else {
+                android.util.Log.w("TicketmasterAPI", "⚠️ No _embedded field found - likely no events for this search")
+            }
             
             val ticketmasterResponse = json.decodeFromString<TicketmasterResponse>(responseBody)
             
@@ -118,6 +159,10 @@ class TicketmasterApiService(private val context: Context) {
                     }
                 }.ifEmpty { null }
                 
+                // Extract latitude and longitude from venue location
+                val latitude = venue?.location?.latitude?.toDoubleOrNull()
+                val longitude = venue?.location?.longitude?.toDoubleOrNull()
+                
                 Event(
                     id = ticketmasterEvent.id,
                     name = ticketmasterEvent.name,
@@ -126,7 +171,9 @@ class TicketmasterApiService(private val context: Context) {
                     image = imageUrl,
                     startTime = dateTime,
                     venueName = venueName,
-                    venueAddress = venueAddress
+                    venueAddress = venueAddress,
+                    latitude = latitude,
+                    longitude = longitude
                 )
             } ?: emptyList()
             

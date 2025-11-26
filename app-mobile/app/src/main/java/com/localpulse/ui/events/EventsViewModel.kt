@@ -35,12 +35,18 @@ class EventsViewModel(
     }
 
     /**
-     * Search for events by city
+     * Search for events with filters
      */
-    fun searchEvents(city: String) {
+    fun searchEvents(
+        city: String,
+        keyword: String = "",
+        category: String = "",
+        startDate: String = "",
+        endDate: String = ""
+    ) {
         viewModelScope.launch {
             _eventsState.value = Resource.Loading
-            _eventsState.value = eventRepository.searchEvents(city)
+            _eventsState.value = eventRepository.searchEvents(city, keyword, category, startDate, endDate)
         }
     }
 

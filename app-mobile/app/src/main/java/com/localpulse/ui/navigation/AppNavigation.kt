@@ -23,7 +23,9 @@ import com.localpulse.ui.favorites.FavoritesScreen
 import com.localpulse.ui.favorites.FavoritesViewModel
 import com.localpulse.ui.favorites.FavoritesViewModelFactory
 import com.localpulse.ui.home.HomeScreen
-import com.localpulse.ui.map.MapPlaceholderScreen
+import com.localpulse.ui.map.MapScreen
+import com.localpulse.ui.map.MapViewModel
+import com.localpulse.ui.map.MapViewModelFactory
 import com.localpulse.ui.recommendations.RecommendationsPlaceholderScreen
 import com.localpulse.util.Constants
 
@@ -152,9 +154,13 @@ fun AppNavigation(
             )
         }
 
-        // Map placeholder screen
+        // Map screen
         composable(Constants.ROUTE_MAP) {
-            MapPlaceholderScreen(
+            val viewModel: MapViewModel = viewModel(
+                factory = MapViewModelFactory(eventRepository, context)
+            )
+            MapScreen(
+                viewModel = viewModel,
                 onNavigateBack = {
                     navController.popBackStack()
                 }

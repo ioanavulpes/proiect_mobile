@@ -2,6 +2,7 @@ package com.localpulse.data.repository
 
 import android.content.Context
 import com.localpulse.data.model.Event
+import com.localpulse.data.model.SearchFilters
 import com.localpulse.data.network.TicketmasterApiService
 import com.localpulse.util.Resource
 import kotlinx.coroutines.Dispatchers
@@ -14,12 +15,36 @@ class EventRepository(context: Context) {
     private val apiService = TicketmasterApiService(context)
 
     /**
-     * Fetch events from Eventbrite API
+     * Fetch events from Ticketmaster API with filters
      */
-    suspend fun searchEvents(city: String): Resource<List<Event>> {
+    suspend fun searchEvents(filters: SearchFilters = SearchFilters()): Resource<List<Event>> {
         return withContext(Dispatchers.IO) {
             try {
-                val events = apiService.searchEvents(city)
+                val events = apiService.searchEvents(
+                    city = filters.city,
+                    keyword = filters.keyword,
+                    category = filters.category
+                )
+                Resource.Success(events)
+            } catch (e: Exception) {
+                Resource.Error(e.message ?: "Failed to fetch events")
+            }
+        }
+    }
+    
+    /**
+     * Fetch events from Ticketmaster API with individual parameters (backward compatibility)
+     */
+    suspend fun searchEvents(
+        city: String,
+        keyword: String = "",
+        category: String = "",
+        startDate: String = "",
+        endDate: String = ""
+    ): Resource<List<Event>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val events = apiService.searchEvents(city, keyword, category, startDate, endDate)
                 Resource.Success(events)
             } catch (e: Exception) {
                 Resource.Error(e.message ?: "Failed to fetch events")

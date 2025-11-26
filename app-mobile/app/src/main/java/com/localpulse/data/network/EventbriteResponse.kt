@@ -87,7 +87,9 @@ data class TicketmasterVenue(
     @SerialName("city")
     val city: VenueCity? = null,
     @SerialName("state")
-    val state: VenueState? = null
+    val state: VenueState? = null,
+    @SerialName("location")
+    val location: VenueLocation? = null
 )
 
 @Serializable
@@ -110,6 +112,14 @@ data class VenueState(
     val name: String? = null,
     @SerialName("stateCode")
     val stateCode: String? = null
+)
+
+@Serializable
+data class VenueLocation(
+    @SerialName("latitude")
+    val latitude: String? = null,
+    @SerialName("longitude")
+    val longitude: String? = null
 )
 
 @Serializable
