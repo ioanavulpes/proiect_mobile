@@ -101,11 +101,19 @@ fun MapScreen(
                 title = { 
                     Column {
                         Text(stringResource(R.string.map))
-                        Text(
-                            text = "${stringResource(R.string.current_city)}: $searchedCity",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
-                        )
+                        if (searchedCity.isNotEmpty()) {
+                            Text(
+                                text = "${stringResource(R.string.current_city)}: $searchedCity",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                            )
+                        } else {
+                            Text(
+                                text = stringResource(R.string.my_location),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f)
+                            )
+                        }
                     }
                 },
                 navigationIcon = {
@@ -180,9 +188,24 @@ fun MapScreen(
             
             when (currentEventsState) {
                 is Resource.Loading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                    Column(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CircularProgressIndicator()
+                        Text(
+                            text = if (currentLocation == null && locationPermissionGranted) {
+                                "Detecting your location..."
+                            } else if (currentLocation != null) {
+                                "Loading nearby events..."
+                            } else {
+                                "Loading events..."
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
                 is Resource.Error -> {
                     Column(
@@ -216,25 +239,14 @@ fun MapScreen(
                     
                     // Debug logging
                     android.util.Log.d("MapScreen", "Total events: ${events.size}, Events with location: ${eventsWithLocation.size}")
-                    events.forEachIndexed { index, event ->
-                        android.util.Log.d("MapScreen", "Event $index: ${event.name} - lat: ${event.latitude}, lng: ${event.longitude}")
-                    }
-
-                    if (eventsWithLocation.isEmpty()) {
-                        // No events with location
-                        NoEventsMessage(
-                            totalEvents = events.size,
-                            onRefresh = { viewModel.loadEvents() }
-                        )
-                    } else {
-                        // Show map
-                        MapContent(
-                            events = eventsWithLocation,
-                            currentLocation = currentLocation,
-                            geocodedLocation = geocodedLocation,
-                            viewModel = viewModel
-                        )
-                    }
+                    
+                    // Always show map, even if no events (user can see their location)
+                    MapContent(
+                        events = eventsWithLocation,
+                        currentLocation = currentLocation,
+                        geocodedLocation = geocodedLocation,
+                        viewModel = viewModel
+                    )
                 }
             }
 
@@ -340,30 +352,44 @@ private fun MapContent(
 ) {
     val context = LocalContext.current
     val cameraPositionState = rememberCameraPositionState()
+    val selectedEvent by viewModel.selectedEvent.collectAsState()
+    val travelInfo by viewModel.travelInfo.collectAsState()
 
     // Auto-adjust camera with improved positioning logic
     LaunchedEffect(events, currentLocation, geocodedLocation) {
-        if (events.isEmpty()) return@LaunchedEffect
-        
         try {
             val target = when {
-                // Priority 1: Use geocoded location if available
+                // Priority 1: Use geocoded location if available (user searched for a city)
                 geocodedLocation != null -> {
                     cameraPositionState.position = CameraPosition.fromLatLngZoom(geocodedLocation, 12f)
                     return@LaunchedEffect
                 }
                 
-                // Priority 2: Use user's actual location if within reasonable distance of events
+                // Priority 2: If no events, center on user's location
+                events.isEmpty() && currentLocation != null -> {
+                    cameraPositionState.position = CameraPosition.fromLatLngZoom(
+                        LatLng(currentLocation.latitude, currentLocation.longitude),
+                        12f
+                    )
+                    return@LaunchedEffect
+                }
+                
+                // Priority 3: If no events and no location, don't move camera
+                events.isEmpty() -> {
+                    return@LaunchedEffect
+                }
+                
+                // Priority 4: Use user's actual location if within reasonable distance of events
                 currentLocation != null && isNearEvents(currentLocation, events) -> {
                     LatLng(currentLocation.latitude, currentLocation.longitude)
                 }
                 
-                // Priority 3: Center on events
+                // Priority 5: Center on events
                 events.isNotEmpty() -> {
                     calculateEventsCenterPoint(events)
                 }
                 
-                // Fallback
+                // Fallback (should not reach here)
                 else -> LatLng(51.5074, -0.1278) // London default
             }
             
@@ -395,8 +421,15 @@ private fun MapContent(
                     
                     MarkerInfoWindowContent(
                         state = MarkerState(position = LatLng(event.latitude, event.longitude)),
+                        onClick = {
+                            // Select event to calculate travel info
+                            android.util.Log.d("MapScreen", "📍 Marker clicked: ${event.name}")
+                            viewModel.selectEvent(event)
+                            true // Return true to show InfoWindow
+                        },
                         onInfoWindowClick = {
                             // Open event URL in browser
+                            android.util.Log.d("MapScreen", "🔗 InfoWindow clicked, opening URL")
                             try {
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.url))
                                 context.startActivity(intent)
@@ -410,6 +443,135 @@ private fun MapContent(
                             event = event,
                             distance = distance
                         )
+                    }
+                }
+            }
+        }
+        
+        // Travel Info Card - shown when event is selected
+        // Save state to local variables to enable smart cast
+        val currentSelectedEvent = selectedEvent
+        val currentTravelInfo = travelInfo
+        
+        if (currentSelectedEvent != null && currentTravelInfo != null && currentLocation != null) {
+            Card(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    // Header with event name and close button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = currentSelectedEvent.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 2
+                        )
+                        IconButton(
+                            onClick = { viewModel.clearSelection() }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close"
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        text = currentSelectedEvent.venueName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Distance (real road distance from Google Maps)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Place,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "${stringResource(R.string.distance)}: ${currentTravelInfo.distanceText}",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Car time (real driving time from Google Maps)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.DirectionsCar,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "${stringResource(R.string.by_car)}: ${currentTravelInfo.carTimeText}",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Walking time (real walking time from Google Maps)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.DirectionsWalk,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "${stringResource(R.string.walking)}: ${currentTravelInfo.walkingTimeText}",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Open in browser button
+                    Button(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(currentSelectedEvent.url))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                android.util.Log.e("MapScreen", "Error opening URL", e)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ExitToApp,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.open_eventbrite))
                     }
                 }
             }
@@ -480,7 +642,7 @@ private fun TravelInfoCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Distance
+            // Distance (real road distance from Google Maps)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Default.Place,
@@ -489,14 +651,15 @@ private fun TravelInfoCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "${stringResource(R.string.distance)}: ${String.format("%.1f", travelInfo.distanceKm)} km",
-                    style = MaterialTheme.typography.bodyLarge
+                    text = "${stringResource(R.string.distance)}: ${travelInfo.distanceText}",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Car time
+            // Car time (real driving time from Google Maps)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Default.DirectionsCar,
@@ -505,14 +668,14 @@ private fun TravelInfoCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "${stringResource(R.string.by_car)}: ${formatTime(travelInfo.carTimeMinutes)}",
+                    text = "${stringResource(R.string.by_car)}: ${travelInfo.carTimeText}",
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Walking time
+            // Walking time (real walking time from Google Maps)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Default.DirectionsWalk,
@@ -521,7 +684,7 @@ private fun TravelInfoCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "${stringResource(R.string.walking)}: ${formatTime(travelInfo.walkingTimeMinutes)}",
+                    text = "${stringResource(R.string.walking)}: ${travelInfo.walkingTimeText}",
                     style = MaterialTheme.typography.bodyLarge
                 )
             }

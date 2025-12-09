@@ -33,15 +33,7 @@ class TicketmasterApiService(private val context: Context) {
             .build()
     }
 
-    /**
-     * Fetches events from Ticketmaster API with advanced filters
-     * @param city The city to search for events
-     * @param keyword Search keyword (artist, event name, venue)
-     * @param category Event category (music, sports, arts, etc.)
-     * @param startDate Start date in format YYYY-MM-DDTHH:mm:ssZ
-     * @param endDate End date in format YYYY-MM-DDTHH:mm:ssZ
-     * @return List of Event objects
-     */
+
     suspend fun searchEvents(
         city: String = Constants.DEFAULT_CITY,
         keyword: String = "",
@@ -185,10 +177,7 @@ class TicketmasterApiService(private val context: Context) {
         }
     }
 
-    /**
-     * Fetches a single event by ID
-     * Note: This searches through all events. In production, use the specific event endpoint.
-     */
+
     suspend fun getEventById(eventId: String): Event? {
         return try {
             searchEvents().find { it.id == eventId }

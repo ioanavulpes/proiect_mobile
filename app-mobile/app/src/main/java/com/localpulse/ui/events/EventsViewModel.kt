@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 /**
  * ViewModel for managing events data
@@ -30,6 +32,14 @@ class EventsViewModel(
     private val _favoriteIds = MutableStateFlow<Set<String>>(emptySet())
     val favoriteIds: StateFlow<Set<String>> = _favoriteIds.asStateFlow()
 
+    private val _selectedDate = MutableStateFlow<LocalDate?>(null)
+    val selectedDate: StateFlow<LocalDate?> = _selectedDate.asStateFlow()
+
+    // Track current search parameters for reuse
+    private var currentCity = Constants.DEFAULT_CITY
+    private var currentKeyword = ""
+    private var currentCategory = ""
+
     init {
         searchEvents(Constants.DEFAULT_CITY)
     }
@@ -44,10 +54,51 @@ class EventsViewModel(
         startDate: String = "",
         endDate: String = ""
     ) {
+        // Store current search parameters
+        currentCity = city
+        currentKeyword = keyword
+        currentCategory = category
+        
         viewModelScope.launch {
             _eventsState.value = Resource.Loading
-            _eventsState.value = eventRepository.searchEvents(city, keyword, category, startDate, endDate)
+            
+            // Convert selected date to ISO 8601 format if present
+            val (actualStartDate, actualEndDate) = if (_selectedDate.value != null) {
+                val date = _selectedDate.value!!
+                val formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+                val start = "${date}T00:00:00Z"
+                val end = "${date}T23:59:59Z"
+                Pair(start, end)
+            } else {
+                Pair(startDate, endDate)
+            }
+            
+            _eventsState.value = eventRepository.searchEvents(
+                city, 
+                keyword, 
+                category, 
+                actualStartDate, 
+                actualEndDate
+            )
         }
+    }
+    
+    /**
+     * Set selected date for filtering
+     */
+    fun setSelectedDate(date: LocalDate) {
+        _selectedDate.value = date
+        // Re-run search with new date filter
+        searchEvents(currentCity, currentKeyword, currentCategory)
+    }
+    
+    /**
+     * Clear date filter
+     */
+    fun clearDateFilter() {
+        _selectedDate.value = null
+        // Re-run search without date filter
+        searchEvents(currentCity, currentKeyword, currentCategory)
     }
 
     /**

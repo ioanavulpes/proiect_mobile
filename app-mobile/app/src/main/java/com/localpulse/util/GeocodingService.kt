@@ -67,10 +67,49 @@ class GeocodingService(private val context: Context) {
     }
     
     /**
+     * Reverse geocode coordinates to city name
+     * Returns city name or null if reverse geocoding fails
+     */
+    suspend fun getCityName(lat: Double, lng: Double): String? = withContext(Dispatchers.IO) {
+        try {
+            val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                // Use new async API for Android 13+
+                getAddressFromLocationAsync(lat, lng)
+            } else {
+                // Use legacy synchronous API
+                @Suppress("DEPRECATION")
+                geocoder.getFromLocation(lat, lng, 1)?.firstOrNull()
+            }
+            
+            // Try to get city name (locality), fallback to admin area or country
+            result?.locality ?: result?.adminArea ?: result?.countryName
+        } catch (e: Exception) {
+            android.util.Log.e("GeocodingService", "Error reverse geocoding ($lat, $lng): ${e.message}", e)
+            null
+        }
+    }
+    
+    /**
+     * Get address from location asynchronously (Android 13+)
+     */
+    private suspend fun getAddressFromLocationAsync(lat: Double, lng: Double): Address? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            suspendCancellableCoroutine { continuation ->
+                geocoder.getFromLocation(lat, lng, 1) { addresses ->
+                    continuation.resume(addresses.firstOrNull())
+                }
+            }
+        } else {
+            null
+        }
+    }
+    
+    /**
      * Clear the cache
      */
     fun clearCache() {
         cache.clear()
     }
 }
+
 

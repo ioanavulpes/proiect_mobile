@@ -42,6 +42,7 @@ fun EventsScreen(
     
     val eventsState by viewModel.eventsState.collectAsState()
     val favoriteIds by viewModel.favoriteIds.collectAsState()
+    val selectedDate by viewModel.selectedDate.collectAsState()
     
     val isRefreshing = eventsState is Resource.Loading
     val context = LocalContext.current
@@ -84,7 +85,10 @@ fun EventsScreen(
                         keyword = keyword,
                         category = category
                     )
-                }
+                },
+                selectedDate = selectedDate,
+                onDateSelected = { date -> viewModel.setSelectedDate(date) },
+                onDateCleared = { viewModel.clearDateFilter() }
             )
 
             // Events list

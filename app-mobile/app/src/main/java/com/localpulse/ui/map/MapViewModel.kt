@@ -14,8 +14,10 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.gms.maps.model.LatLng
+import com.localpulse.R
 import com.localpulse.data.model.Event
 import com.localpulse.data.model.SearchFilters
+import com.localpulse.data.network.GoogleDistanceMatrixService
 import com.localpulse.data.repository.EventRepository
 import com.localpulse.util.GeocodingService
 import com.localpulse.util.Resource
@@ -39,7 +41,7 @@ class MapViewModel(
 ) : ViewModel() {
 
     private val _eventsState: MutableStateFlow<Resource<List<Event>>> = 
-        MutableStateFlow(Resource.Loading)
+        MutableStateFlow(Resource.Success(emptyList()))
     val eventsState: StateFlow<Resource<List<Event>>> = _eventsState.asStateFlow()
 
     private val _currentLocation: MutableStateFlow<Location?> = MutableStateFlow(null)
@@ -54,7 +56,7 @@ class MapViewModel(
     private val _locationPermissionGranted: MutableStateFlow<Boolean> = MutableStateFlow(false)
     val locationPermissionGranted: StateFlow<Boolean> = _locationPermissionGranted.asStateFlow()
 
-    private val _searchedCity: MutableStateFlow<String> = MutableStateFlow(com.localpulse.util.Constants.DEFAULT_CITY)
+    private val _searchedCity: MutableStateFlow<String> = MutableStateFlow("")
     val searchedCity: StateFlow<String> = _searchedCity.asStateFlow()
 
     private val _geocodedLocation: MutableStateFlow<LatLng?> = MutableStateFlow(null)
@@ -65,12 +67,16 @@ class MapViewModel(
     
     private val geocodingService = GeocodingService(context.applicationContext)
     
+    // Use separate API key for Distance Matrix (must have "Application restrictions" = "None")
+    private val distanceMatrixApiKey = context.getString(R.string.google_distance_matrix_api_key)
+    private val distanceMatrixService = GoogleDistanceMatrixService(distanceMatrixApiKey)
+    
     private val appContext = context.applicationContext
 
     init {
         checkLocationPermission()
-        // Load events with default city that has coordinates
-        loadEvents(SearchFilters(city = com.localpulse.util.Constants.DEFAULT_CITY))
+        // Only detect user location - DO NOT load events automatically
+        // Events will be loaded only when user searches for a city
     }
 
     /**
@@ -120,6 +126,9 @@ class MapViewModel(
                     Log.d(TAG, "✅ Location received: ${location.latitude}, ${location.longitude}")
                     Log.d(TAG, "   Accuracy: ${location.accuracy}m, Provider: ${location.provider}")
                     
+                    // Only set location - DO NOT load events automatically
+                    // Events will be loaded when user searches for a city
+                    
                     // Calculate travel info if an event is selected
                     _selectedEvent.value?.let { event ->
                         calculateTravelInfo(event)
@@ -146,6 +155,9 @@ class MapViewModel(
             if (location != null) {
                 _currentLocation.value = location
                 Log.d(TAG, "✅ Last known location: ${location.latitude}, ${location.longitude}")
+                
+                // Only set location - DO NOT load events automatically
+                // Events will be loaded when user searches for a city
                 
                 // Calculate travel info if an event is selected
                 _selectedEvent.value?.let { event ->
@@ -180,9 +192,96 @@ class MapViewModel(
     }
 
     /**
-     * Calculate travel info (distance and estimated time)
+     * Calculate travel info using Google Distance Matrix API for real road distances
      */
     private fun calculateTravelInfo(event: Event) {
+        val currentLoc = _currentLocation.value
+        val eventLat = event.latitude
+        val eventLng = event.longitude
+
+        if (currentLoc == null || eventLat == null || eventLng == null) {
+            _travelInfo.value = null
+            Log.w(TAG, "Cannot calculate travel info: missing location data")
+            return
+        }
+
+        Log.d(TAG, "==========================================")
+        Log.d(TAG, "🚗 CALCULATING TRAVEL INFO")
+        Log.d(TAG, "==========================================")
+        Log.d(TAG, "From: ${currentLoc.latitude}, ${currentLoc.longitude}")
+        Log.d(TAG, "To: $eventLat, $eventLng")
+        Log.d(TAG, "Event: ${event.name}")
+
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "📍 Step 1: Requesting DRIVING distance...")
+                
+                // Get driving distance
+                val drivingResult = distanceMatrixService.getDistanceAndDuration(
+                    originLat = currentLoc.latitude,
+                    originLng = currentLoc.longitude,
+                    destLat = eventLat,
+                    destLng = eventLng,
+                    mode = "driving"
+                )
+
+                if (drivingResult == null) {
+                    Log.w(TAG, "⚠️ Driving distance API returned null")
+                    Log.w(TAG, "⚠️ Using FALLBACK calculation (straight line)")
+                    calculateTravelInfoFallback(event)
+                    return@launch
+                }
+
+                Log.d(TAG, "📍 Step 2: Requesting WALKING distance...")
+
+                // Get walking distance
+                val walkingResult = distanceMatrixService.getDistanceAndDuration(
+                    originLat = currentLoc.latitude,
+                    originLng = currentLoc.longitude,
+                    destLat = eventLat,
+                    destLng = eventLng,
+                    mode = "walking"
+                )
+
+                if (walkingResult == null) {
+                    Log.w(TAG, "⚠️ Walking distance API returned null")
+                    Log.w(TAG, "⚠️ Using FALLBACK calculation (straight line)")
+                    calculateTravelInfoFallback(event)
+                    return@launch
+                }
+
+                _travelInfo.value = TravelInfo(
+                    distanceKm = drivingResult.distanceKm,
+                    distanceText = drivingResult.distanceText,
+                    carTimeMinutes = drivingResult.durationMinutes,
+                    carTimeText = drivingResult.durationText,
+                    walkingTimeMinutes = walkingResult.durationMinutes,
+                    walkingTimeText = walkingResult.durationText
+                )
+                
+                Log.d(TAG, "==========================================")
+                Log.d(TAG, "✅ SUCCESS - REAL DISTANCES FROM GOOGLE MAPS")
+                Log.d(TAG, "==========================================")
+                Log.d(TAG, "🚗 Driving: ${drivingResult.distanceText} in ${drivingResult.durationText}")
+                Log.d(TAG, "🚶 Walking: ${walkingResult.distanceText} in ${walkingResult.durationText}")
+                Log.d(TAG, "==========================================")
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "==========================================")
+                Log.e(TAG, "❌ ERROR in calculateTravelInfo")
+                Log.e(TAG, "==========================================")
+                Log.e(TAG, "Error: ${e.message}", e)
+                Log.e(TAG, "⚠️ Using FALLBACK calculation (straight line)")
+                calculateTravelInfoFallback(event)
+            }
+        }
+    }
+
+    /**
+     * Fallback: Calculate travel info using Haversine formula (straight line)
+     * Used when Google Distance Matrix API fails
+     */
+    private fun calculateTravelInfoFallback(event: Event) {
         val currentLoc = _currentLocation.value
         val eventLat = event.latitude
         val eventLng = event.longitude
@@ -208,9 +307,22 @@ class MapViewModel(
 
         _travelInfo.value = TravelInfo(
             distanceKm = distance,
+            distanceText = String.format("~%.1f km", distance),  // ~ indicates approximate
             carTimeMinutes = carTimeMinutes.toInt(),
-            walkingTimeMinutes = walkingTimeMinutes.toInt()
+            carTimeText = "~${carTimeMinutes.toInt()} min",  // ~ indicates approximate
+            walkingTimeMinutes = walkingTimeMinutes.toInt(),
+            walkingTimeText = "~${walkingTimeMinutes.toInt()} min"  // ~ indicates approximate
         )
+        
+        Log.d(TAG, "==========================================")
+        Log.d(TAG, "⚠️ USING FALLBACK (STRAIGHT LINE)")
+        Log.d(TAG, "==========================================")
+        Log.d(TAG, "Distance (straight line): ${String.format("%.1f", distance)} km")
+        Log.d(TAG, "Estimated car time (60 km/h): ${carTimeMinutes.toInt()} min")
+        Log.d(TAG, "Estimated walking time (5 km/h): ${walkingTimeMinutes.toInt()} min")
+        Log.d(TAG, "⚠️ This is NOT the real road distance!")
+        Log.d(TAG, "⚠️ To get real distances, enable Distance Matrix API")
+        Log.d(TAG, "==========================================")
     }
 
     /**
@@ -302,6 +414,9 @@ class MapViewModel(
  */
 data class TravelInfo(
     val distanceKm: Double,
+    val distanceText: String,
     val carTimeMinutes: Int,
-    val walkingTimeMinutes: Int
+    val carTimeText: String,
+    val walkingTimeMinutes: Int,
+    val walkingTimeText: String
 )
